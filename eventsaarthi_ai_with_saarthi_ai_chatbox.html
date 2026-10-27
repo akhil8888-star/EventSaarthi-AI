@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EventSaarthi AI — Every Celebration Deserves to Go Right</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts (Inter & Playfair Display for luxury gold accents) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- React & ReactDOM CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              dark: '#101522',
+              navy: '#171F31',
+              card: '#1D273D',
+              gold: '#E8C77A',
+              goldHover: '#D9B362',
+              cream: '#F4E7C8',
+              bgLight: '#FAF9F6',
+              borderGold: 'rgba(232, 199, 122, 0.25)'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            serif: ['Playfair Display', 'serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #101522;
+      color: #F4E7C8;
+      font-family: 'Inter', sans-serif;
+    }
+    /* Custom Scrollbar for Chat & App */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #171F31;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #E8C77A33;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #E8C77A88;
+    }
+    .gold-gradient-text {
+      background: linear-gradient(135deg, #FFF0CA 0%, #E8C77A 50%, #B8923F 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .gold-border-glow {
+      box-shadow: 0 0 15px rgba(232, 199, 122, 0.15);
+    }
+    .chat-slide-up {
+      animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-100 selection:bg-amber-500 selection:text-slate-950">
+
+  <div id="root"></div>
+
+  <!-- Firebase Modular Imports via standard script tag -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Setup global Firebase reference bridge for React component access
+    window.FirebaseBridge = {
+      initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut,
+      getFirestore, doc, getDoc, setDoc, updateDoc, collection, onSnapshot
+    };
+  </script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // --- HELPER CONSTANTS & DUMMY INITIAL DATA ---
+    const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'eventsaarthi-default-id';
+    
+    const INITIAL_EVENTS = [
+      {
+        id: 'evt-1',
+        name: 'Aarav & Ananya Royal Wedding',
+        type: 'Wedding',
+        date: '2026-11-18',
+        location: 'Udaipur Palace Grounds, Rajasthan',
+        guestCount: 350,
+        budget: 2500000,
+        spent: 1450000,
+        theme: 'Royal Rajasthani Heritage',
+        status: 'Planning'
+      },
+      {
+        id: 'evt-2',
+        name: 'Rohan 30th Birthday Bash',
+        type: 'Birthday',
+        date: '2026-12-05',
+        location: 'Cyber Hub Lounge, Gurugram',
+        guestCount: 65,
+        budget: 180000,
+        spent: 42000,
+        theme: 'Neon Retro Cyberpunk',
+        status: 'Confirmed'
+      }
+    ];
+
+    const INITIAL_CHECKLIST = [
+      { id: 'c1', eventId: 'evt-1', task: 'Finalize Palace Mandap Decorator', category: 'Decor', completed: true, dueDate: '2026-09-15' },
+      { id: 'c2', eventId: 'evt-1', task: 'Send WhatsApp Save-the-Date Cards', category: 'Guests', completed: true, dueDate: '2026-09-20' },
+      { id: 'c3', eventId: 'evt-1', task: 'Sample Royal Thali Menu tasting with Caterer', category: 'Food', completed: false, dueDate: '2026-10-30' },
+      { id: 'c4', eventId: 'evt-2', task: 'Book DJ & Light Show Techs', category: 'Entertainment', completed: false, dueDate: '2026-11-10' },
+    ];
+
+    const INITIAL_GUESTS = [
+      { id: 'g1', eventId: 'evt-1', name: 'Rajesh Sharma', category: 'VIP', status: 'Accepted', diet: 'Strict Jain', count: 4, seatingNote: 'Front Stage Table' },
+      { id: 'g2', eventId: 'evt-1', name: 'Priya Verma', category: 'Family', status: 'Pending', diet: 'Vegetarian', count: 2, seatingNote: 'Family Courtyard' },
+      { id: 'g3', eventId: 'evt-2', name: 'Karan Mehra', category: 'Friends', status: 'Accepted', diet: 'Non-Veg', count: 1, seatingNote: 'Bar Side' }
+    ];
+
+    const INITIAL_VENDORS = [
+      { id: 'v1', name: 'Royal Rajputana Decorators', category: 'Decor', contact: '+91 98765 43210', quote: 650000, rating: 4.9, status: 'Booked' },
+      { id: 'v2', name: 'Heritage Spice Caterers', category: 'Catering', contact: '+91 91234 56789', quote: 900000, rating: 4.8, status: 'Negotiating' },
+      { id: 'v3', name: 'ShutterBeats Photography', category: 'Media', contact: '+91 99887 76655', quote: 220000, rating: 4.7, status: 'Shortlisted' }
+    ];
+
+    const INITIAL_SPECIAL_DAYS = [
+      { id: 'sd1', name: 'Mom & Dad Anniversary', date: '2026-11-04', type: 'Anniversary', reminderDays: 7 },
+      { id: 'sd2', name: 'Riya Diwali Gifting', date: '2026-11-08', type: 'Festival', reminderDays: 5 }
+    ];
+
+    // --- GEMINI API CALLER ---
+    async function callGeminiApi(prompt, chatHistory = [], systemInstruction = "") {
+      const apiKey = ""; // Canvas runtime automatically supplies API key when blank
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+      // Build turn structure
+      const contents = [];
+      
+      // Inject previous turn context
+      chatHistory.forEach(msg => {
+        contents.push({
+          role: msg.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.text }]
+        });
+      });
+
+      // Add current prompt
+      contents.push({
+        role: 'user',
+        parts: [{ text: prompt }]
+      });
+
+      const payload = {
+        contents: contents,
+        systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined
+      };
+
+      try {
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          throw new Error(`Gemini API Error (Status ${res.status})`);
+        }
+
+        const data = await res.json();
+        const candidate = data.candidates?.[0];
+        if (candidate && candidate.content?.parts?.[0]?.text) {
+          return candidate.content.parts[0].text;
+        } else {
+          throw new Error("Invalid response format from Gemini API.");
+        }
+      } catch (err) {
+        console.error("Gemini API Invocation Exception:", err);
+        throw err;
+      }
+    }
+
+    // --- MAIN REACT APPLICATION COMPONENT ---
+    function App() {
+      // User State
+      const [user, setUser] = useState({ uid: 'guest-user-123', email: 'planner@eventsaarthi.com', isGuest: true });
+      const [isAuthenticated, setIsAuthenticated] = useState(true);
+      const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, events, planner, budget, checklist, guests, vendors, gifts, specialDays
+
+      // Core Data States
+      const [events, setEvents] = useState(INITIAL_EVENTS);
+      const [selectedEventId, setSelectedEventId] = useState('evt-1');
+      const [checklist, setChecklist] = useState(INITIAL_CHECKLIST);
+      const [guests, setGuests] = useState(INITIAL_GUESTS);
+      const [vendors, setVendors] = useState(INITIAL_VENDORS);
+      const [specialDays, setSpecialDays] = useState(INITIAL_SPECIAL_DAYS);
+
+      // Active Event Context Memo
+      const currentEvent = useMemo(() => {
+        return events.find(e => e.id === selectedEventId) || events[0] || null;
+      }, [events, selectedEventId]);
+
+      // --- SAARTHI AI CHATBOX STATES ---
+      const [isChatOpen, setIsChatOpen] = useState(false);
+      const [chatSessions, setChatSessions] = useState(() => {
+        const saved = localStorage.getItem('saarthi_chat_sessions');
+        return saved ? JSON.parse(saved) : [
+          {
+            id: 'session-default',
+            title: 'Welcome to Saarthi AI',
+            messages: [
+              {
+                id: 'm1',
+                sender: 'ai',
+                text: 'Namaste! I am Saarthi AI, your personal Indian Event & Celebration Strategist. How can I assist with your planning, budget, gifts, or vendors today?',
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              }
+            ]
+          }
+        ];
+      });
+      const [activeSessionId, setActiveSessionId] = useState('session-default');
+      const [chatInput, setChatInput] = useState('');
+      const [isAiLoading, setIsAiLoading] = useState(false);
+      const [chatError, setChatError] = useState(null);
+      const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+      const chatEndRef = useRef(null);
+
+      // Save chat sessions locally & simulate user-level persistence
+      useEffect(() => {
+        localStorage.setItem('saarthi_chat_sessions', JSON.stringify(chatSessions));
+      }, [chatSessions]);
+
+      // Auto-scroll chat
+      useEffect(() => {
+        if (isChatOpen) {
+          chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, [chatSessions, isChatOpen, isAiLoading]);
+
+      // Active chat session getter
+      const activeSession = useMemo(() => {
+        return chatSessions.find(s => s.id === activeSessionId) || chatSessions[0];
+      }, [chatSessions, activeSessionId]);
+
+      // --- CHAT ACTIONS ---
+      const handleSendMessage = async (textToSend) => {
+        const promptText = textToSend || chatInput.trim();
+        if (!promptText || isAiLoading) return;
+
+        const userMsg = {
+          id: 'user-' + Date.now(),
+          sender: 'user',
+          text: promptText,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        // Append user message immediately
+        setChatSessions(prev => prev.map(session => {
+          if (session.id === activeSessionId) {
+            return {
+              ...session,
+              messages: [...session.messages, userMsg],
+              // Auto-name untitled or default session if first user message
+              title: session.messages.length <= 1 ? promptText.slice(0, 24) + '...' : session.title
+            };
+          }
+          return session;
+        }));
+
+        setChatInput('');
+        setIsAiLoading(true);
+        setChatError(null);
+
+        // System Instruction with Context Injection
+        let systemPrompt = `You are Saarthi AI, an expert, warm, and highly experienced Indian Celebration & Event Strategist working within the EventSaarthi AI platform.
+Provide helpful, highly contextual, structured, and practical advice on Indian weddings, birthdays, anniversaries, corporate galas, vendor negotiations, budget allocation in INR (₹), decor trends, and guest hospitality.`;
+
+        if (currentEvent) {
+          systemPrompt += `\n\nCURRENT EVENT CONTEXT:
+- Name: ${currentEvent.name}
+- Type: ${currentEvent.type}
+- Target Date: ${currentEvent.date}
+- Venue/Location: ${currentEvent.location}
+- Guest Count: ${currentEvent.guestCount} guests
+- Total Budget: ₹${currentEvent.budget.toLocaleString('en-IN')}
+- Current Spent: ₹${currentEvent.spent.toLocaleString('en-IN')} (Remaining: ₹${(currentEvent.budget - currentEvent.spent).toLocaleString('en-IN')})
+- Theme: ${currentEvent.theme}`;
+        }
+
+        try {
+          // Send chat history without the current user message (will be passed as prompt)
+          const historyForApi = activeSession.messages.filter(m => m.id !== userMsg.id);
+          const aiResponseText = await callGeminiApi(promptText, historyForApi, systemPrompt);
+
+          const aiMsg = {
+            id: 'ai-' + Date.now(),
+            sender: 'ai',
+            text: aiResponseText,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          };
+
+          setChatSessions(prev => prev.map(session => {
+            if (session.id === activeSessionId) {
+              return { ...session, messages: [...session.messages, aiMsg] };
+            }
+            return session;
+          }));
+        } catch (err) {
+          setChatError("Unable to reach Saarthi AI right now. Please check your network or API connection.");
+        } finally {
+          setIsAiLoading(false);
+        }
+      };
+
+      const startNewChat = () => {
+        const newId = 'session-' + Date.now();
+        const newSession = {
+          id: newId,
+          title: 'New Conversation',
+          messages: [
+            {
+              id: 'm1',
+              sender: 'ai',
+              text: 'Namaste! Saarthi AI is ready. How can I help you plan or optimize your event today?',
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }
+          ]
+        };
+        setChatSessions(prev => [newSession, ...prev]);
+        setActiveSessionId(newId);
+        setIsDrawerOpen(false);
+      };
+
+      const handleQuickAction = (actionPrompt) => {
+        setIsChatOpen(true);
+        handleSendMessage(actionPrompt);
+      };
+
+      // --- EVENT HANDLERS FOR MAIN CONTENT ---
+      const handleCreateEvent = (newEvent) => {
+        const created = { ...newEvent, id: 'evt-' + Date.now(), spent: 0, status: 'Planning' };
+        setEvents([created, ...events]);
+        setSelectedEventId(created.id);
+      };
+
+      return (
+        <div className="min-h-screen bg-brand-dark flex flex-col font-sans">
+          
+          {/* HEADER / NAVIGATION BAR */}
+          <header className="sticky top-0 z-30 bg-brand-navy/95 backdrop-blur border-b border-brand-borderGold px-4 lg:px-8 py-3.5 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-400 to-yellow-200 flex items-center justify-center shadow-lg shadow-amber-500/10">
+                <i data-lucide="sparkles" class="w-5 h-5 text-slate-950 font-bold"></i>
+              </div>
+              <div>
+                <h1 className="font-serif text-xl font-bold tracking-wide gold-gradient-text">EventSaarthi AI</h1>
+                <p className="text-[10px] text-amber-200/60 uppercase tracking-widest hidden sm:block">Every Celebration Deserves to Go Right</p>
+              </div>
+            </div>
+
+            {/* Event Selector Dropdown */}
+            {currentEvent && (
+              <div className="hidden md:flex items-center space-x-2 bg-brand-dark/60 border border-brand-borderGold px-3 py-1.5 rounded-lg">
+                <i data-lucide="calendar" class="w-4 h-4 text-amber-400"></i>
+                <span className="text-xs text-amber-200/70 font-medium">Active:</span>
+                <select 
+                  value={selectedEventId}
+                  onChange={(e) => setSelectedEventId(e.target.value)}
+                  className="bg-transparent text-xs font-semibold text-amber-100 focus:outline-none cursor-pointer"
+                >
+                  {events.map(evt => (
+                    <option key={evt.id} value={evt.id} className="bg-brand-navy text-slate-100">{evt.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Auth / Profile */}
+            <div className="flex items-center space-x-3">
+              <span className="text-xs text-amber-200/80 hidden sm:inline-block">Planner: <strong className="text-white">{user.email}</strong></span>
+              <button 
+                onClick={() => setIsAuthenticated(!isAuthenticated)} 
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-400/10 border border-brand-borderGold text-amber-300 hover:bg-amber-400/20 transition"
+              >
+                {isAuthenticated ? 'Sign Out' : 'Sign In'}
+              </button>
+            </div>
+          </header>
+
+          {/* MAIN CONTAINER */}
+          <div className="flex-1 flex flex-col lg:flex-row">
+            
+            {/* SIDEBAR NAVIGATION */}
+            <aside className="w-full lg:w-64 bg-brand-navy border-r border-brand-borderGold/40 p-4 shrink-0">
+              <nav className="space-y-1">
+                {[
+                  { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
+                  { id: 'events', label: 'My Events', icon: 'calendar-heart' },
+                  { id: 'planner', label: 'AI Planner', icon: 'sparkles' },
+                  { id: 'budget', label: 'Budget Tracker', icon: 'indian-rupee' },
+                  { id: 'checklist', label: 'Checklist & Timeline', icon: 'check-square' },
+                  { id: 'guests', label: 'Guest Manager', icon: 'users' },
+                  { id: 'vendors', label: 'Vendor Hub', icon: 'briefcase' },
+                  { id: 'gifts', label: 'Gift Finder & Shop', icon: 'gift' },
+                  { id: 'specialDays', label: 'Special Days', icon: 'bell' }
+                ].map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition ${
+                      activeTab === item.id 
+                        ? 'bg-amber-400/15 text-amber-300 border border-brand-borderGold font-semibold shadow-sm' 
+                        : 'text-amber-100/70 hover:bg-brand-card hover:text-white'
+                    }`}
+                  >
+                    <i data-lucide={item.icon} class={`w-4 h-4 ${activeTab === item.id ? 'text-amber-400' : 'text-slate-400'}`}></i>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </nav>
+
+              {/* Active Event Card Summary in Sidebar */}
+              {currentEvent && (
+                <div className="mt-8 p-3.5 rounded-xl bg-brand-dark/70 border border-brand-borderGold/30 text-xs">
+                  <div className="flex items-center justify-between text-amber-300 mb-2">
+                    <span className="font-semibold uppercase text-[10px] tracking-wider">Active Event</span>
+                    <span className="px-1.5 py-0.5 rounded bg-amber-400/20 text-[10px]">{currentEvent.type}</span>
+                  </div>
+                  <h4 className="font-semibold text-slate-100 truncate">{currentEvent.name}</h4>
+                  <p className="text-slate-400 text-[11px] mt-1">{currentEvent.date} • {currentEvent.guestCount} Guests</p>
+                  <div className="mt-2.5 w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-amber-500 to-amber-300 h-1.5 rounded-full" 
+                      style={{ width: `${Math.min(100, (currentEvent.spent / currentEvent.budget) * 100)}%` }}
+                    ></div>
+                  </div>
+                  <div className="flex justify-between mt-1 text-[10px] text-slate-400">
+                    <span>Spent: ₹{currentEvent.spent.toLocaleString('en-IN')}</span>
+                    <span>Max: ₹{(currentEvent.budget / 100000).toFixed(1)}L</span>
+                  </div>
+                </div>
+              )}
+            </aside>
+
+            {/* DYNAMIC DASHBOARD / FEATURE VIEWS */}
+            <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
+              {activeTab === 'dashboard' && (
+                <DashboardView 
+                  events={events} 
+                  currentEvent={currentEvent} 
+                  checklist={checklist} 
+                  onQuickAction={handleQuickAction}
+                  setActiveTab={setActiveTab}
+                />
+              )}
+              {activeTab === 'events' && (
+                <EventsManagerView events={events} onCreate={handleCreateEvent} setSelectedEventId={setSelectedEventId} />
+              )}
+              {activeTab === 'planner' && (
+                <AiPlannerView currentEvent={currentEvent} onQuickAction={handleQuickAction} />
+              )}
+              {activeTab === 'budget' && (
+                <BudgetTrackerView currentEvent={currentEvent} onQuickAction={handleQuickAction} />
+              )}
+              {activeTab === 'checklist' && (
+                <ChecklistView checklist={checklist} setChecklist={setChecklist} currentEvent={currentEvent} />
+              )}
+              {activeTab === 'guests' && (
+                <GuestManagerView guests={guests} setGuests={setGuests} currentEvent={currentEvent} />
+              )}
+              {activeTab === 'vendors' && (
+                <VendorHubView vendors={vendors} onQuickAction={handleQuickAction} />
+              )}
+              {activeTab === 'gifts' && (
+                <GiftFinderView currentEvent={currentEvent} onQuickAction={handleQuickAction} />
+              )}
+              {activeTab === 'specialDays' && (
+                <SpecialDaysView specialDays={specialDays} setSpecialDays={setSpecialDays} />
+              )}
+            </main>
+          </div>
+
+          {/* ========================================================= */}
+          {/* FLOATING SAARTHI AI ASSISTANT CHAT TRIGGER & PANEL        */}
+          {/* ========================================================= */}
+          {!isChatOpen && (
+            <button
+              onClick={() => setIsChatOpen(true)}
+              className="fixed bottom-6 right-6 z-40 flex items-center space-x-2.5 px-4 py-3 rounded-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-bold shadow-2xl hover:scale-105 active:scale-95 transition-all gold-border-glow group"
+            >
+              <div className="w-7 h-7 rounded-full bg-slate-950/10 flex items-center justify-center">
+                <i data-lucide="bot" class="w-5 h-5 text-slate-950"></i>
+              </div>
+              <span className="text-sm tracking-wide">Ask Saarthi AI</span>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-950 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-900"></span>
+              </span>
+            </button>
+          )}
+
+          {/* EXPANDED CHAT PANEL */}
+          {isChatOpen && (
+            <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[420px] h-[580px] max-h-[85vh] bg-brand-navy border border-brand-borderGold rounded-2xl shadow-2xl flex flex-col overflow-hidden chat-slide-up">
+              
+              {/* CHAT HEADER */}
+              <div className="bg-brand-card px-4 py-3 border-b border-brand-borderGold/40 flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <button 
+                    onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+                    className="p-1.5 rounded-lg text-amber-300 hover:bg-amber-400/10 transition"
+                    title="Conversation History"
+                  >
+                    <i data-lucide="history" class="w-5 h-5"></i>
+                  </button>
+                  <div>
+                    <div className="flex items-center space-x-1.5">
+                      <h3 className="font-serif font-bold text-amber-300 text-sm">Saarthi AI Assistant</h3>
+                      <span className="text-[9px] bg-amber-400/20 text-amber-200 px-1.5 py-0.5 rounded uppercase tracking-wider font-semibold">Gemini 3</span>
+                    </div>
+                    <p className="text-[10px] text-amber-200/60 truncate max-w-[200px]">{activeSession.title}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-1">
+                  <button 
+                    onClick={startNewChat}
+                    className="p-1.5 rounded-lg text-amber-300 hover:bg-amber-400/10 transition text-xs flex items-center space-x-1"
+                    title="New Chat"
+                  >
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                  </button>
+                  <button 
+                    onClick={() => setIsChatOpen(false)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                  >
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                  </button>
+                </div>
+              </div>
+
+              {/* SESSION DRAWER SLIDE-OVER */}
+              {isDrawerOpen && (
+                <div className="absolute top-[53px] left-0 right-0 bottom-0 bg-brand-dark/95 z-20 p-4 border-b border-brand-borderGold overflow-y-auto">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs uppercase tracking-wider text-amber-300 font-bold">Saved Conversations</h4>
+                    <button 
+                      onClick={startNewChat}
+                      className="px-2.5 py-1 bg-amber-400/20 hover:bg-amber-400/30 text-amber-200 text-xs rounded-md border border-brand-borderGold flex items-center space-x-1"
+                    >
+                      <i data-lucide="plus" class="w-3 h-3"></i>
+                      <span>New Chat</span>
+                    </button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {chatSessions.map(session => (
+                      <div 
+                        key={session.id}
+                        onClick={() => { setActiveSessionId(session.id); setIsDrawerOpen(false); }}
+                        className={`p-2.5 rounded-lg cursor-pointer text-xs flex items-center justify-between transition ${
+                          session.id === activeSessionId ? 'bg-amber-400/20 border border-brand-borderGold text-amber-200' : 'bg-brand-card hover:bg-slate-800 text-slate-300'
+                        }`}
+                      >
+                        <span className="truncate pr-2">{session.title}</span>
+                        <span className="text-[10px] text-slate-500 shrink-0">{session.messages.length} msgs</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* QUICK ACTION SHORTCUT CHIPS */}
+              <div className="bg-brand-dark/50 px-3 py-2 border-b border-brand-borderGold/20 flex items-center space-x-1.5 overflow-x-auto text-[11px]">
+                <button 
+                  onClick={() => handleSendMessage("Help me plan a complete execution strategy for my event.")}
+                  className="px-2.5 py-1 rounded-full bg-amber-400/10 border border-brand-borderGold text-amber-200 hover:bg-amber-400/20 shrink-0"
+                >
+                  ✨ Plan Event
+                </button>
+                <button 
+                  onClick={() => handleSendMessage("Suggest 5 concrete ways to reduce my current budget without sacrificing quality.")}
+                  className="px-2.5 py-1 rounded-full bg-amber-400/10 border border-brand-borderGold text-amber-200 hover:bg-amber-400/20 shrink-0"
+                >
+                  💡 Reduce Budget
+                </button>
+                <button 
+                  onClick={() => handleSendMessage("Give me curated gift ideas suitable for my upcoming event.")}
+                  className="px-2.5 py-1 rounded-full bg-amber-400/10 border border-brand-borderGold text-amber-200 hover:bg-amber-400/20 shrink-0"
+                >
+                  🎁 Find Gift
+                </button>
+                <button 
+                  onClick={() => handleSendMessage("What critical tasks am I missing on my checklist right now?")}
+                  className="px-2.5 py-1 rounded-full bg-amber-400/10 border border-brand-borderGold text-amber-200 hover:bg-amber-400/20 shrink-0"
+                >
+                  ✅ Checklist Help
+                </button>
+                <button 
+                  onClick={() => handleSendMessage("Draft a polite but firm negotiation email for my caterer quote.")}
+                  className="px-2.5 py-1 rounded-full bg-amber-400/10 border border-brand-borderGold text-amber-200 hover:bg-amber-400/20 shrink-0"
+                >
+                  🤝 Negotiate Vendor
+                </button>
+              </div>
+
+              {/* MESSAGES SCROLL AREA */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-3.5 bg-brand-dark/40">
+                {activeSession.messages.map((msg) => (
+                  <div 
+                    key={msg.id} 
+                    className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
+                  >
+                    <div 
+                      className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed whitespace-pre-wrap ${
+                        msg.sender === 'user'
+                          ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-medium rounded-tr-none'
+                          : 'bg-brand-card text-slate-100 border border-brand-borderGold/40 rounded-tl-none'
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                    <span className="text-[9px] text-slate-500 mt-1 px-1">{msg.timestamp}</span>
+                  </div>
+                ))}
+
+                {/* AI LOADING INDICATOR */}
+                {isAiLoading && (
+                  <div className="flex items-center space-x-2 bg-brand-card text-amber-300 p-3 rounded-2xl rounded-tl-none border border-brand-borderGold/30 w-36">
+                    <div className="w-2 h-2 rounded-full bg-amber-400 animate-bounce"></div>
+                    <div className="w-2 h-2 rounded-full bg-amber-400 animate-bounce [animation-delay:0.2s]"></div>
+                    <div className="w-2 h-2 rounded-full bg-amber-400 animate-bounce [animation-delay:0.4s]"></div>
+                    <span className="text-[11px] font-medium text-amber-200">Saarthi thinking...</span>
+                  </div>
+                )}
+
+                {/* ERROR STATE */}
+                {chatError && (
+                  <div className="p-3 bg-red-900/30 border border-red-500/40 rounded-xl text-red-200 text-xs flex items-center justify-between">
+                    <span>{chatError}</span>
+                    <button 
+                      onClick={() => handleSendMessage(activeSession.messages[activeSession.messages.length - 1]?.text || "Retry")}
+                      className="px-2 py-1 bg-red-500/20 hover:bg-red-500/40 rounded text-[10px] font-bold underline"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* MESSAGE INPUT BOX */}
+              <div className="p-3 bg-brand-navy border-t border-brand-borderGold/30">
+                <form 
+                  onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
+                  className="flex items-center space-x-2"
+                >
+                  <textarea
+                    rows="1"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    placeholder="Ask Saarthi AI (Enter to send, Shift+Enter for new line)..."
+                    className="flex-1 bg-brand-dark/90 text-xs text-white placeholder-slate-400 p-2.5 rounded-xl border border-brand-borderGold/30 focus:outline-none focus:border-amber-400 resize-none max-h-24"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!chatInput.trim() || isAiLoading}
+                    className="p-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                  >
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                  </button>
+                </form>
+              </div>
+
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // --- DASHBOARD SUB-VIEW COMPONENT ---
+    function DashboardView({ events, currentEvent, checklist, onQuickAction, setActiveTab }) {
+      const pendingTasks = checklist.filter(c => !c.completed).length;
+
+      return (
+        <div className="space-y-6">
+          {/* WELCOME BANNER */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-navy via-brand-card to-slate-900 p-6 border border-brand-borderGold gold-border-glow">
+            <div className="relative z-10 max-w-2xl">
+              <span className="px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 text-xs font-semibold uppercase tracking-wider">EventSaarthi AI Hub</span>
+              <h2 className="font-serif text-2xl lg:text-3xl font-bold mt-2 gold-gradient-text">
+                Welcome back, Master Planner
+              </h2>
+              <p className="text-amber-100/70 text-xs lg:text-sm mt-2 leading-relaxed">
+                Your AI-driven celebration headquarters is active. Saarthi AI is standing by to optimize budget, draft vendor contracts, and coordinate guest experiences.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button 
+                  onClick={() => onQuickAction("Generate a full strategic execution summary for my active event.")}
+                  className="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 font-bold text-xs hover:bg-amber-300 transition shadow-md"
+                >
+                  ✨ AI Strategic Briefing
+                </button>
+                <button 
+                  onClick={() => setActiveTab('planner')}
+                  className="px-4 py-2 rounded-xl bg-brand-dark border border-brand-borderGold text-amber-300 text-xs hover:bg-slate-800 transition"
+                >
+                  Explore AI Planner
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* METRIC CARDS GRID */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-brand-navy p-4 rounded-xl border border-brand-borderGold/40 flex items-center space-x-4">
+              <div className="p-3 bg-amber-400/15 rounded-xl text-amber-400">
+                <i data-lucide="calendar" class="w-6 h-6"></i>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Active Events</p>
+                <h3 className="text-xl font-bold text-white">{events.length} Planned</h3>
+              </div>
+            </div>
+
+            <div className="bg-brand-navy p-4 rounded-xl border border-brand-borderGold/40 flex items-center space-x-4">
+              <div className="p-3 bg-emerald-400/15 rounded-xl text-emerald-400">
+                <i data-lucide="indian-rupee" class="w-6 h-6"></i>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Active Budget</p>
+                <h3 className="text-xl font-bold text-white">₹{currentEvent ? (currentEvent.budget / 100000).toFixed(1) + ' Lakhs' : '0'}</h3>
+              </div>
+            </div>
+
+            <div className="bg-brand-navy p-4 rounded-xl border border-brand-borderGold/40 flex items-center space-x-4">
+              <div className="p-3 bg-blue-400/15 rounded-xl text-blue-400">
+                <i data-lucide="users" class="w-6 h-6"></i>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Total Guests</p>
+                <h3 className="text-xl font-bold text-white">{currentEvent ? currentEvent.guestCount : 0} Confirmed</h3>
+              </div>
+            </div>
+
+            <div className="bg-brand-navy p-4 rounded-xl border border-brand-borderGold/40 flex items-center space-x-4">
+              <div className="p-3 bg-purple-400/15 rounded-xl text-purple-400">
+                <i data-lucide="check-square" class="w-6 h-6"></i>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Pending Tasks</p>
+                <h3 className="text-xl font-bold text-white">{pendingTasks} Action Items</h3>
+              </div>
+            </div>
+          </div>
+
+          {/* RECENT EVENTS & SAARTHI AI QUICK COMMANDS */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Active Event Overview */}
+            <div className="lg:col-span-2 bg-brand-navy p-5 rounded-2xl border border-brand-borderGold/40">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-serif font-bold text-amber-300 text-base">Active Event Blueprint</h3>
+                <button onClick={() => setActiveTab('events')} className="text-xs text-amber-400 hover:underline">Manage All Events →</button>
+              </div>
+              
+              {currentEvent ? (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-brand-card border border-brand-borderGold/30">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-bold text-lg text-white">{currentEvent.name}</h4>
+                        <p className="text-xs text-amber-200/60 mt-0.5">{currentEvent.location} • {currentEvent.date}</p>
+                      </div>
+                      <span className="px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 text-xs font-semibold">{currentEvent.status}</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-brand-borderGold/20 text-center">
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase">Theme</p>
+                        <p className="text-xs font-semibold text-amber-200 truncate">{currentEvent.theme}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase">Guests</p>
+                        <p className="text-xs font-semibold text-amber-200">{currentEvent.guestCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase">Est. Budget</p>
+                        <p className="text-xs font-semibold text-amber-200">₹{currentEvent.budget.toLocaleString('en-IN')}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">No active event selected.</p>
+              )}
+            </div>
+
+            {/* AI Assistant Quick Actions Card */}
+            <div className="bg-brand-navy p-5 rounded-2xl border border-brand-borderGold/40 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center space-x-2 text-amber-300 mb-2">
+                  <i data-lucide="bot" class="w-5 h-5"></i>
+                  <h3 className="font-serif font-bold text-base">Saarthi AI Short-Cuts</h3>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                  Instant strategic prompts pre-configured for Indian event dynamics:
+                </p>
+                
+                <div className="space-y-2">
+                  <button 
+                    onClick={() => onQuickAction("How can I negotiate a 15% discount with my catering vendor?")}
+                    className="w-full text-left p-2.5 rounded-xl bg-brand-card hover:bg-slate-800 border border-brand-borderGold/20 text-xs text-amber-100 transition"
+                  >
+                    🤝 Vendor Negotiation Strategy
+                  </button>
+                  <button 
+                    onClick={() => onQuickAction("Give me a 5-step checklist for 30 days prior to the event date.")}
+                    className="w-full text-left p-2.5 rounded-xl bg-brand-card hover:bg-slate-800 border border-brand-borderGold/20 text-xs text-amber-100 transition"
+                  >
+                    📅 30-Day Countdown Plan
+                  </button>
+                  <button 
+                    onClick={() => onQuickAction("Suggest unique return gift ideas for VIP guests under ₹1,500 each.")}
+                    className="w-full text-left p-2.5 rounded-xl bg-brand-card hover:bg-slate-800 border border-brand-borderGold/20 text-xs text-amber-100 transition"
+                  >
+                    🎁 VIP Gifting Strategy
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-brand-borderGold/20 text-center">
+                <span className="text-[10px] text-amber-200/50">Powered by Gemini 3 Flash Real-Time Engine</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    // --- EVENTS MANAGER SUB-VIEW ---
+    function EventsManagerView({ events, onCreate, setSelectedEventId }) {
+      const [name, setName] = useState('');
+      const [type, setType] = useState('Wedding');
+      const [date, setDate] = useState('');
+      const [location, setLocation] = useState('');
+      const [guestCount, setGuestCount] = useState(150);
+      const [budget, setBudget] = useState(500000);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!name || !date) return;
+        onCreate({ name, type, date, location, guestCount: Number(guestCount), budget: Number(budget), theme: 'Modern Classic' });
+        setName('');
+        setDate('');
+        setLocation('');
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="font-serif text-2xl font-bold gold-gradient-text">Event Portfolio</h2>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Create Event Form */}
+            <form onSubmit={handleSubmit} className="bg-brand-navy p-5 rounded-2xl border border-brand-borderGold space-y-4">
+              <h3 className="font-serif font-bold text-amber-300 text-base">Create New Event</h3>
+              <div>
+                <label className="text-xs text-slate-300 block mb-1">Event Name</label>
+                <input 
+                  type="text" 
+                  value={name} 
+                  onChange={e => setName(e.target.value)} 
+                  placeholder="e.g. Sangeet & Mehendi Night"
+                  className="w-full bg-brand-dark p-2.5 rounded-xl border border-brand-borderGold/30 text-xs text-white focus:outline-none focus:border-amber-400" 
+                  required 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">Type</label>
+                  <select 
+                    value={type} 
+                    onChange={e => setType(e.target.value)} 
+                    className="w-full bg-brand-dark p-2.5 rounded-xl border border-brand-borderGold/30 text-xs text-white focus:outline-none"
+                  >
+                    <option value="Wedding">Wedding</option>
+                    <option value="Birthday">Birthday</option>
+                    <option value="Anniversary">Anniversary</option>
+                    <option value="Corporate">Corporate</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">Date</label>
+                  <input 
+                    type="date" 
+                    value={date} 
+                    onChange={e => setDate(e.target.value)} 
+                    className="w-full bg-brand-dark p-2.5 rounded-xl border border-brand-borderGold/30 text-xs text-white focus:outline-none" 
+                    required 
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-300 block mb-1">Location / Venue</label>
+                <input 
+                  type="text" 
+                  value={location} 
+                  onChange={e => setLocation(e.target.value)} 
+                  placeholder="e.g. The Leela Palace, Bengaluru"
+                  className="w-full bg-brand-dark p-2.5 rounded-xl border border-brand-borderGold/30 text-xs text-white focus:outline-none" 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">Guest Count</label>
+                  <input 
+                    type="number" 
+                    value={guestCount} 
+                    onChange={e => setGuestCount(e.target.value)} 
+                    className="w-full bg-brand-dark p-2.5 rounded-xl border border-brand-borderGold/30 text-xs text-white focus:outline-none" 
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">Budget (₹)</label>
+                  <input 
+                    type="number" 
+                    value={budget} 
+                    onChange={e => setBudget(e.target.value)} 
+                    className="w-full bg-brand-dark p-2.5 rounded-xl border border-brand-borderGold/30 text-xs text-white focus:outline-none" 
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="w-full py-2.5 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-bold rounded-xl text-xs hover:opacity-95 transition">
+                Save & Initialize Event
+              </button>
+            </form>
+
+            {/* List of Existing Events */}
+            <div className="lg:col-span-2 space-y-3">
+              {events.map(evt => (
+                <div key={evt.id} className="bg-brand-navy p-4 rounded-xl border border-brand-borderGold/30 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h4 className="font-bold text-white text-base">{evt.name}</h4>
+                      <span className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 text-[10px] font-semibold">{evt.type}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">{evt.location || 'Venue TBD'} • {evt.date}</p>
+                    <p className="text-xs text-amber-200/70 mt-1">Guests: <strong>{evt.guestCount}</strong> | Budget: <strong>₹{evt.budget.toLocaleString('en-IN')}</strong></p>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedEventId(evt.id)}
+                    className="px-3 py-1.5 rounded-lg bg-amber-400/10 border border-brand-borderGold text-amber-300 text-xs font-semibold hover:bg-amber-400/20 transition"
+                  >
+                    Select Active
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- OTHER FEATURE PLACEHOLDER VIEWS ---
+    function AiPlannerView({ currentEvent, onQuickAction }) {
+      return (
+        <div className="space-y-4">
+          <h2 className="font-serif text-2xl font-bold gold-gradient-text">Structured AI Planner</h2>
+          <div className="bg-brand-navy p-6 rounded-2xl border border-brand-borderGold/40 text-center space-y-4">
+            <p className="text-sm text-slate-300 max-w-lg mx-auto">
+              Generate themes, catering menus, decor palettes, and timelines crafted for {currentEvent ? currentEvent.name : 'your active celebration'}.
+            </p>
+            <button 
+              onClick={() => onQuickAction("Generate a full theme & decor concept with color palette for my active event.")}
+              className="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-bold text-xs rounded-xl shadow-lg hover:opacity-95 transition"
+            >
+              ✨ Generate AI Theme & Timeline Brief
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    function BudgetTrackerView({ currentEvent, onQuickAction }) {
+      return (
+        <div className="space-y-4">
+          <h2 className="font-serif text-2xl font-bold gold-gradient-text">Budget Tracker & AI Rescue</h2>
+          <div className="bg-brand-navy p-6 rounded-2xl border border-brand-borderGold/40 text-center space-y-4">
+            <p className="text-sm text-slate-300 max-w-lg mx-auto">
+              Keep every rupee accounted for. Current budget allocated: <strong>₹{currentEvent ? currentEvent.budget.toLocaleString('en-IN') : 0}</strong>.
+            </p>
+            <button 
+              onClick={() => onQuickAction("Analyze my budget variance and tell me where to cut expenses by 20%.")}
+              className="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-bold text-xs rounded-xl shadow-lg hover:opacity-95 transition"
+            >
+              💡 Run AI Budget Optimizer
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    function ChecklistView({ checklist, setChecklist, currentEvent }) {
+      return (
+        <div className="space-y-4">
+          <h2 className="font-serif text-2xl font-bold gold-gradient-text">Checklist & Timeline</h2>
+          <div className="bg-brand-navy p-5 rounded-2xl border border-brand-borderGold/40 space-y-2">
+            {checklist.map(item => (
+              <div key={item.id} className="flex items-center space-x-3 p-3 bg-brand-card rounded-xl border border-brand-borderGold/20">
+                <input 
+                  type="checkbox" 
+                  checked={item.completed} 
+                  onChange={() => setChecklist(checklist.map(c => c.id === item.id ? { ...c, completed: !c.completed } : c))}
+                  className="w-4 h-4 accent-amber-400 cursor-pointer" 
+                />
+                <span className={`text-xs flex-1 ${item.completed ? 'line-through text-slate-500' : 'text-slate-200 font-medium'}`}>{item.task}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-400/10 text-amber-300">{item.category}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function GuestManagerView({ guests, setGuests, currentEvent }) {
+      return (
+        <div className="space-y-4">
+          <h2 className="font-serif text-2xl font-bold gold-gradient-text">Guest Manager</h2>
+          <div className="bg-brand-navy p-5 rounded-2xl border border-brand-borderGold/40 space-y-3">
+            {guests.map(g => (
+              <div key={g.id} className="flex justify-between items-center p-3 bg-brand-card rounded-xl border border-brand-borderGold/20 text-xs">
+                <div>
+                  <h4 className="font-bold text-white">{g.name} ({g.count} Pax)</h4>
+                  <p className="text-slate-400 text-[11px]">{g.category} • Diet: {g.diet}</p>
+                </div>
+                <span className="px-2.5 py-1 rounded bg-emerald-400/20 text-emerald-300 font-semibold">{g.status}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function VendorHubView({ vendors, onQuickAction }) {
+      return (
+        <div className="space-y-4">
+          <h2 className="font-serif text-2xl font-bold gold-gradient-text">Vendor Hub & AI Negotiation</h2>
+          <div className="bg-brand-navy p-5 rounded-2xl border border-brand-borderGold/40 space-y-3">
+            {vendors.map(v => (
+              <div key={v.id} className="flex justify-between items-center p-3 bg-brand-card rounded-xl border border-brand-borderGold/20 text-xs">
+                <div>
+                  <h4 className="font-bold text-white">{v.name} ({v.category})</h4>
+                  <p className="text-slate-400 text-[11px]">Quote: ₹{v.quote.toLocaleString('en-IN')} | Rating: ⭐ {v.rating}</p>
+                </div>
+                <button 
+                  onClick={() => onQuickAction(`Draft a negotiation email for vendor ${v.name} with quote ₹${v.quote}.`)}
+                  className="px-3 py-1.5 bg-amber-400/15 border border-brand-borderGold text-amber-300 rounded-lg text-xs font-medium hover:bg-amber-400/25 transition"
+                >
+                  🤝 AI Negotiate Quote
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function GiftFinderView({ currentEvent, onQuickAction }) {
+      return (
+        <div className="space-y-4">
+          <h2 className="font-serif text-2xl font-bold gold-gradient-text">Gift Finder & Recommendations</h2>
+          <div className="bg-brand-navy p-6 rounded-2xl border border-brand-borderGold/40 text-center space-y-4">
+            <p className="text-sm text-slate-300 max-w-lg mx-auto">
+              Find 3-tier gift suggestions with Amazon, Flipkart, and Ferns N Petals search links.
+            </p>
+            <button 
+              onClick={() => onQuickAction("Suggest 3 premium return gift ideas for guests with purchase links.")}
+              className="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-bold text-xs rounded-xl shadow-lg hover:opacity-95 transition"
+            >
+              🎁 Find AI Gifts
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    function SpecialDaysView({ specialDays, setSpecialDays }) {
+      return (
+        <div className="space-y-4">
+          <h2 className="font-serif text-2xl font-bold gold-gradient-text">Special Days & Reminders</h2>
+          <div className="bg-brand-navy p-5 rounded-2xl border border-brand-borderGold/40 space-y-3">
+            {specialDays.map(sd => (
+              <div key={sd.id} className="flex justify-between items-center p-3 bg-brand-card rounded-xl border border-brand-borderGold/20 text-xs">
+                <div>
+                  <h4 className="font-bold text-white">{sd.name}</h4>
+                  <p className="text-slate-400 text-[11px]">Date: {sd.date} • Remind {sd.reminderDays} days prior</p>
+                </div>
+                <span className="px-2 py-1 rounded bg-amber-400/20 text-amber-300">{sd.type}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // --- INITIALIZE LUCIDE ICONS ON MOUNT & UPDATES ---
+    function LucideIconInitializer() {
+      useEffect(() => {
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      });
+      return null;
+    }
+
+    // --- RENDER APP ---
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(
+      <React.Fragment>
+        <App />
+        <LucideIconInitializer />
+      </React.Fragment>
+    );
+  </script>
+</body>
+</html>
